@@ -1,69 +1,64 @@
 const mineflayer = require('mineflayer');
 
+const config = {
+  host: 'survivaldepanchos.mcsh.io',
+  port: 25565,
+  username: 'Raboot_356',
+  version: false
+};
+
+let bot;
+let reconnecting = false;
+
 function createBot() {
-    const bot = mineflayer.createBot({
-        host: 'survivaldepanchos.mcsh.io', // <--- REEMPLAZA ESTO POR LA IP DE TU SERVER
-        port: 25565,                // Puerto predeterminado de Minecraft
-        username: 'Raboot_356',    // Nombre genérico del bot/NPC dentro del juego
-        version: false              // Autodetecta la versión exacta del servidor (1.8 a 1.21+)
-    });
+  console.log('Conectando a Minecraft...');
 
-    bot.on('spawn', () => {
-        console.log(`[NPC] El bot ha aparecido correctamente en el mapa.`);
-        // Si tu servidor No-Premium requiere contraseña, descomenta la línea de abajo:
-        // setTimeout(() => bot.chat('/login erickJKN'), 4000);
-    });
+  bot = mineflayer.createBot(config);
 
-    bot.on('login', () => {
-        console.log(`[NPC] Conexión establecida con el servidor de Minecraft.`);
-    });
+  bot.once('spawn', () => {
+    console.log('✅ Raboot_356 está conectado');
 
-    // Rutina automatizada del NPC: Buscar cofre, interactuar, cerrar y saltar (Cada 45 segundos)
-    setInterval(async () => {
-        if (!bot || !bot.entity) return;
+    // Mantener al bot activo
+    bot.setControlState('forward', false);
+    bot.setControlState('back', false);
+    bot.setControlState('left', false);
+    bot.setControlState('right', false);
+    bot.setControlState('jump', false);
+    bot.setControlState('sprint', false);
+  });
 
-        try {
-            // 1. Localizar el bloque de cofre en un radio de 5 bloques
-            const chestBlock = bot.findBlock({
-                matching: bot.registry.blocksByName.chest.id,
-                maxDistance: 5
-            });
+  bot.on('chat', (username, message) => {
+    console.log(`[CHAT] ${username}: ${message}`);
+  });
 
-            if (chestBlock) {
-                console.log('[NPC] Interactuando con el contenedor cercano...');
-                
-                // 2. Abrir el contenedor (genera la animación y sonido físico en el servidor)
-                const chest = await bot.openChest(chestBlock);
-                console.log('[NPC] Contenedor abierto.');
-                
-                // Mantener la interfaz abierta durante 2 segundos simulando actividad de inventario
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                
-                // 3. Cerrar la interfaz del contenedor
-                chest.close();
-                console.log('[NPC] Contenedor cerrado.');
-            } else {
-                console.log('[NPC] Aviso: No se detectó ningún contenedor válido cerca.');
-            }
+  bot.on('kicked', (reason) => {
+    console.log('⚠️ El bot fue expulsado:', reason);
+  });
 
-            // 4. Ejecutar acción de salto físico para evitar la inactividad (Anti-AFK)
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            bot.setControlState('jump', true);
-            setTimeout(() => bot.setControlState('jump', false), 500);
-            console.log('[NPC] Acción anti-inactividad completada con éxito.');
+  bot.on('error', (err) => {
+    console.log('❌ Error:', err.message);
+  });
 
-        } catch (err) {
-            console.log(`[NPC] Error en el ciclo de ejecución: ${err.message}`);
-        }
-    }, 45000);
+  bot.on('end', () => {
+    if (reconnecting) return;
 
-    // Sistema de auto-reconexión segura tras expulsiones o reinicios del servidor
-    bot.on('end', (reason) => {
-        console.log(`[NPC] Conexión finalizada por: ${reason}. Reintentando en 25 segundos...`);
-        setTimeout(createBot, 25000);
-    });
+    reconnecting = true;
+    console.log('🔄 Desconectado. Intentando reconectar en 10 segundos...');
 
-    bot.on('error', (err) => console.log(`[NPC] Error crítico de red detectado: ${err}`));
+    setTimeout(() => {
+      reconnecting = false;
+      createBot();
+    }, 10000);
+  });
 }
 
 createBot();
+
+// Evita que GitHub termine el proceso por un error inesperado
+process.on('uncaughtException', (err) => {
+  console.log('⚠️ Error inesperado:', err.message);
+});
+
+process.on('unhandledRejection', (err) => {
+  console.log('⚠️ Promesa rechazada:', err);
+});
